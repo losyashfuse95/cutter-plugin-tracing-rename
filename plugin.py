@@ -51,7 +51,15 @@ class MyDockWidget(cutter.CutterDockWidget):
             self.table_widget.setItem(row, 2, table_item_new_name)
 
     def update_function_data(self):
-        function_data = cutter.cmdj("aflj")
+        function_data = self.get_function_data()
+        renamed_function_data = self.create_renamed_function_data(function_data)
+        self.save_to_json(file_path, renamed_function_data)
+        self.load_data_from_json(file_path)
+
+    def get_function_data(self):
+        return cutter.cmdj("aflj")
+
+    def create_renamed_function_data(self, function_data):
         renamed_functions = MyCutterPlugin.renamed_functions
         renamed_function_data = [
             {
@@ -61,8 +69,16 @@ class MyDockWidget(cutter.CutterDockWidget):
             }
             for func in function_data
         ]
-        self.add_to_json(file_path, renamed_function_data)
-        self.load_data_from_json(file_path)
+        return renamed_function_data
+
+    def save_to_json(self, file_path, data):
+        with open(file_path, 'w') as file:
+            json.dump(data, file)
+
+    def load_data_from_json(self, file_path):
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+            self.populate_table_with_function_data(data)
 
     def set_table_width(self):
         header = self.table_widget.horizontalHeader()  # Получение горизонтального заголовка таблицы
@@ -83,11 +99,6 @@ class MyDockWidget(cutter.CutterDockWidget):
     def add_to_json(self, file_path, data):
         with open(file_path, 'w') as file:
             json.dump(data, file)
-
-    def load_data_from_json(self, file_path):
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-            self.populate_table_with_function_data(data)
                       
 class MyCutterPlugin(cutter.CutterPlugin):
     name = "My Plugin"  
