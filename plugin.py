@@ -3,7 +3,9 @@ import json
 import os
 
 from PySide2.QtWidgets import QAction, QTableWidget, QTableWidgetItem, QLineEdit, QVBoxLayout, QWidget, QSizePolicy, QHeaderView
-from PySide2.QtCore import QTimer
+from PySide2.QtCore import QTimer, SIGNAL, QObject
+
+
 
 
 current_dir = os.path.dirname(__file__)
@@ -23,7 +25,7 @@ class MyDockWidget(cutter.CutterDockWidget):
         self.table_widget = QTableWidget()  # Создание таблицы
         self.table_widget.setColumnCount(3)  # Установка количества столбцов
         self.table_widget.setHorizontalHeaderLabels(["Address", "Original Name", "New Name"])  # Установка заголовков столбцов
-        self.update_function_data()
+        # self.update_function_data()
         self.set_table_width() 
         layout.addWidget(self.table_widget)  # Добавление таблицы в лэйаут
 
@@ -31,11 +33,19 @@ class MyDockWidget(cutter.CutterDockWidget):
         self.widget().setLayout(layout)  # Установка лэйаута для виджета
 
         self.table_widget.itemClicked.connect(self.on_item_clicked)  # Подключение обработчика события нажатия на элемент таблицы
+        cutter.core().functionRenamed.connect(self.handle_function_renamed)
+
 
         self.table_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # Установка политики размера для таблицы
-        self.timer = QTimer(self)  # Создание таймера
-        self.timer.timeout.connect(self.update_function_data) 
-        self.timer.start(10000) 
+        # self.timer = QTimer(self)  # Создание таймера
+        # self.timer.timeout.connect(self.update_function_data) 
+        # self.timer.start(10000) 
+    def handle_function_renamed(self,address, new_name):
+        # Ваш код для обработки переименования функции
+            # преобразование адреса в int
+        address_str = hex(int(address, 16))  # преобразование в hex строку
+
+        print(f"Переименованная функция находится по адресу: , новое имя: {address_str}")
 
     def populate_table_with_function_data(self, function_data):
         self.table_widget.setRowCount(len(function_data))
