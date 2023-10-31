@@ -35,7 +35,7 @@ class MyDockWidget(cutter.CutterDockWidget):
         self.table_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # Установка политики размера для таблицы
         self.timer = QTimer(self)  # Создание таймера
         self.timer.timeout.connect(self.update_function_data) 
-        self.timer.start(1000) 
+        self.timer.start(10000) 
 
     def populate_table_with_function_data(self, function_data):
         self.table_widget.setRowCount(len(function_data))
@@ -52,24 +52,11 @@ class MyDockWidget(cutter.CutterDockWidget):
 
     def update_function_data(self):
         function_data = self.get_function_data()
-        renamed_function_data = self.create_renamed_function_data(function_data)
-        self.save_to_json(file_path, renamed_function_data)
+        self.save_to_json(file_path, function_data)
         self.load_data_from_json(file_path)
 
     def get_function_data(self):
         return cutter.cmdj("aflj")
-
-    def create_renamed_function_data(self, function_data):
-        renamed_functions = MyCutterPlugin.renamed_functions
-        renamed_function_data = [
-            {
-                "offset": func.get("offset"),
-                "name": func.get("name"),
-                "new_name": renamed_functions.get(func.get("offset"), func.get("name")) if func.get("offset") in renamed_functions else ""
-            }
-            for func in function_data
-        ]
-        return renamed_function_data
 
     def save_to_json(self, file_path, data):
         with open(file_path, 'w') as file:
@@ -105,7 +92,6 @@ class MyCutterPlugin(cutter.CutterPlugin):
     description = "This plugin does awesome things!" 
     version = "1.0" 
     author = "1337 h4x0r" 
-    renamed_functions = {} 
 
     def setupPlugin(self):
         pass  # Метод для инициализации плагина
