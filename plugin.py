@@ -1,6 +1,7 @@
 import cutter
 import json
 import os
+import codecs
 
 from PySide2.QtWidgets import QAction, QTableWidget, QTableWidgetItem, QLineEdit, QVBoxLayout, QWidget, QSizePolicy, QHeaderView
 from PySide2.QtCore import QTimer, SIGNAL, QObject
@@ -25,7 +26,7 @@ class MyDockWidget(cutter.CutterDockWidget):
         self.table_widget = QTableWidget()  # Создание таблицы
         self.table_widget.setColumnCount(3)  # Установка количества столбцов
         self.table_widget.setHorizontalHeaderLabels(["Address", "Original Name", "New Name"])  # Установка заголовков столбцов
-        # self.update_function_data()
+        self.update_function_data()
         self.set_table_width() 
         layout.addWidget(self.table_widget)  # Добавление таблицы в лэйаут
 
@@ -33,19 +34,41 @@ class MyDockWidget(cutter.CutterDockWidget):
         self.widget().setLayout(layout)  # Установка лэйаута для виджета
 
         self.table_widget.itemClicked.connect(self.on_item_clicked)  # Подключение обработчика события нажатия на элемент таблицы
-        cutter.core().functionRenamed.connect(self.handle_function_renamed)
+        cutter.core().functionRenamed.connect(self.update_function_data)
 
 
         self.table_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # Установка политики размера для таблицы
         # self.timer = QTimer(self)  # Создание таймера
         # self.timer.timeout.connect(self.update_function_data) 
         # self.timer.start(10000) 
-    def handle_function_renamed(self,address, new_name):
-        # Ваш код для обработки переименования функции
-            # преобразование адреса в int
-        address_str = hex(int(address, 16))  # преобразование в hex строку
 
-        print(f"Переименованная функция находится по адресу: , новое имя: {address_str}")
+
+    def update_function_data(self):
+        try:
+            function_data = self.get_function_data()  # Retrieve function data using the existing method
+            print(f"Retrieved function data: {function_data}")
+            self.add_to_json(file_path, function_data)  # Append function data to the JSON file
+            self.load_data_from_json(file_path)  # Reload data from the updated JSON file to update the table
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+
+    def get_function_data(self):
+        function_data_str = cutter.cmdj("aflj")  # Получение данных о функциях в виде строки
+        function_data = json.loads(function_data_str)  # Преобразование строки в формат JSON
+        filtered_data = []  # Инициализация пустого списка для отфильтрованных данных
+        for data in function_data:
+            filtered_data.append({
+                "offset": data.get("offset", "-"),
+                "name": data.get("name", "-"),
+                "new_name": data.get("new_name", "")
+            })
+        return filtered_data
+
+    def add_to_json(self, file_path, data):
+        with codecs.open(file_path, 'w', encoding='utf-8') as file:
+            json.dump(data, file, ensure_ascii=False, indent=4)
+
 
     def populate_table_with_function_data(self, function_data):
         self.table_widget.setRowCount(len(function_data))
@@ -59,18 +82,6 @@ class MyDockWidget(cutter.CutterDockWidget):
             self.table_widget.setItem(row, 0, table_item_offset)
             self.table_widget.setItem(row, 1, table_item_original_name)
             self.table_widget.setItem(row, 2, table_item_new_name)
-
-    def update_function_data(self):
-        function_data = self.get_function_data()
-        self.save_to_json(file_path, function_data)
-        self.load_data_from_json(file_path)
-
-    def get_function_data(self):
-        return cutter.cmdj("aflj")
-
-    def save_to_json(self, file_path, data):
-        with open(file_path, 'w') as file:
-            json.dump(data, file)
 
     def load_data_from_json(self, file_path):
         with open(file_path, 'r') as file:
@@ -93,9 +104,6 @@ class MyDockWidget(cutter.CutterDockWidget):
         item = QTableWidgetItem(new_name)
         self.table_widget.setItem(row, 2, item)  # Обновление содержимого ячейки на новое имя
     
-    def add_to_json(self, file_path, data):
-        with open(file_path, 'w') as file:
-            json.dump(data, file)
                       
 class MyCutterPlugin(cutter.CutterPlugin):
     name = "My Plugin"  
@@ -104,8 +112,8 @@ class MyCutterPlugin(cutter.CutterPlugin):
     author = "1337 h4x0r" 
 
     def setupPlugin(self):
-        pass  # Метод для инициализации плагина
-
+        pass
+    
     def setupInterface(self, main):
         action = QAction("My Plugin", main)  # Создание действия для плагина
         action.setCheckable(True)  # Установка возможности отметки действия
