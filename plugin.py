@@ -1,7 +1,6 @@
 import cutter
 import json
 import os
-import codecs
 
 from PySide2.QtWidgets import QAction, QTableWidget, QTableWidgetItem, QLineEdit, QVBoxLayout, QWidget, QSizePolicy, QHeaderView
 from PySide2.QtCore import QTimer, SIGNAL, QObject
@@ -26,7 +25,7 @@ class MyDockWidget(cutter.CutterDockWidget):
         self.table_widget = QTableWidget()  # Создание таблицы
         self.table_widget.setColumnCount(3)  # Установка количества столбцов
         self.table_widget.setHorizontalHeaderLabels(["Address", "Original Name", "New Name"])  # Установка заголовков столбцов
-        self.update_function_data()
+        #self.update_function_data()
         self.set_table_width() 
         layout.addWidget(self.table_widget)  # Добавление таблицы в лэйаут
 
@@ -42,33 +41,28 @@ class MyDockWidget(cutter.CutterDockWidget):
         # self.timer.timeout.connect(self.update_function_data) 
         # self.timer.start(10000) 
 
+    def add_to_json(self, file_path, data):
+        with open(file_path, 'w') as file:
+            json.dump(data, file)
+
 
     def update_function_data(self):
-        try:
-            function_data = self.get_function_data()  # Retrieve function data using the existing method
-            print(f"Retrieved function data: {function_data}")
-            self.add_to_json(file_path, function_data)  # Append function data to the JSON file
-            self.load_data_from_json(file_path)  # Reload data from the updated JSON file to update the table
-        except Exception as e:
-            print(f"An error occurred: {e}")
+        function_data = self.get_function_data()
+        self.add_to_json(file_path, function_data)
+        self.load_data_from_json(file_path)
 
 
     def get_function_data(self):
-        function_data_str = cutter.cmdj("aflj")  # Получение данных о функциях в виде строки
-        function_data = json.loads(function_data_str)  # Преобразование строки в формат JSON
-        filtered_data = []  # Инициализация пустого списка для отфильтрованных данных
-        for data in function_data:
-            filtered_data.append({
-                "offset": data.get("offset", "-"),
-                "name": data.get("name", "-"),
-                "new_name": data.get("new_name", "")
-            })
+        functions = cutter.cmdj("aflj")  # Получаем все данные о функциях
+        filtered_data = []  # Создаем пустой список для отфильтрованных данных
+        for function in functions:
+            filtered_function = {
+                "offset": function["offset"],  # Извлекаем поле 'offset'
+                "name": function["name"],  # Извлекаем поле 'name'
+                "new_name": "",  # Устанавливаем поле 'new_name' изначально как пустую строку
+            }
+            filtered_data.append(filtered_function)  # Добавляем отфильтрованную функцию в список
         return filtered_data
-
-    def add_to_json(self, file_path, data):
-        with codecs.open(file_path, 'w', encoding='utf-8') as file:
-            json.dump(data, file, ensure_ascii=False, indent=4)
-
 
     def populate_table_with_function_data(self, function_data):
         self.table_widget.setRowCount(len(function_data))
