@@ -15,6 +15,11 @@ if not os.path.exists(file_path):
     with open(file_path, 'w') as file:
         json.dump([], file)  # Создание файла с начальным содержимым - пустым списком
 
+initial_data_file_path = os.path.join(current_dir, "initial_data.json")
+if not os.path.exists(initial_data_file_path):
+    with open(initial_data_file_path, 'w') as file:
+        json.dump([], file) 
+
 class MyDockWidget(cutter.CutterDockWidget):
     def __init__(self, parent, action):
         super(MyDockWidget, self).__init__(parent, action)
@@ -25,7 +30,6 @@ class MyDockWidget(cutter.CutterDockWidget):
         self.table_widget = QTableWidget()  # Создание таблицы
         self.table_widget.setColumnCount(3)  # Установка количества столбцов
         self.table_widget.setHorizontalHeaderLabels(["Address", "Original Name", "New Name"])  # Установка заголовков столбцов
-        #self.update_function_data()
         self.set_table_width() 
         layout.addWidget(self.table_widget)  # Добавление таблицы в лэйаут
 
@@ -34,7 +38,7 @@ class MyDockWidget(cutter.CutterDockWidget):
 
         self.table_widget.itemClicked.connect(self.on_item_clicked)  # Подключение обработчика события нажатия на элемент таблицы
         cutter.core().functionRenamed.connect(self.update_function_data)
-
+        cutter.core().functionRenamed.connect(self.update_function_data_initial_data)
 
         self.table_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  # Установка политики размера для таблицы
         # self.timer = QTimer(self)  # Создание таймера
@@ -45,12 +49,26 @@ class MyDockWidget(cutter.CutterDockWidget):
         with open(file_path, 'w') as file:
             json.dump(data, file)
 
+    def update_function_data_initial_data(self):
+        function_data = self.get_function_data_initial_data()
+        self.add_to_json(initial_data_file_path, function_data)
+        self.load_data_from_json(file_path)
+
+    def get_function_data_initial_data(self):
+        functions = cutter.cmdj("aflj")  # Получаем все данные о функциях
+        filtered_data = []  # Создаем пустой список для отфильтрованных данных
+        for function in functions:
+            filtered_function = {
+                "offset": function["offset"],  # Извлекаем поле 'offset'
+                "name": function["name"],  # Извлекаем поле 'name'
+            }
+            filtered_data.append(filtered_function)  # Добавляем отфильтрованную функцию в список
+        return filtered_data
 
     def update_function_data(self):
         function_data = self.get_function_data()
         self.add_to_json(file_path, function_data)
         self.load_data_from_json(file_path)
-
 
     def get_function_data(self):
         functions = cutter.cmdj("aflj")  # Получаем все данные о функциях
