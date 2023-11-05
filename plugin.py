@@ -3,7 +3,7 @@ import json
 import os
 from PySide2.QtCore import Qt
 
-from PySide2.QtWidgets import QAction, QTableWidget, QTableWidgetItem, QLineEdit, QVBoxLayout, QWidget, QSizePolicy, QHeaderView
+from PySide2.QtWidgets import QAction, QPushButton, QTableWidget, QTableWidgetItem, QLineEdit, QVBoxLayout, QWidget, QSizePolicy, QHeaderView
 
 class MyDockWidget(cutter.CutterDockWidget):
     def __init__(self, parent, action, plugin):
@@ -14,8 +14,8 @@ class MyDockWidget(cutter.CutterDockWidget):
 
         layout = QVBoxLayout()  
         self.table_widget = QTableWidget()  
-        self.table_widget.setColumnCount(3)  
-        self.table_widget.setHorizontalHeaderLabels(["Address", "Original Name", "New Name"])  
+        self.table_widget.setColumnCount(4)  
+        self.table_widget.setHorizontalHeaderLabels(["Address", "Original Name", "New Name", ""])  
         self.set_table_width() 
         layout.addWidget(self.table_widget)  
 
@@ -31,10 +31,11 @@ class MyDockWidget(cutter.CutterDockWidget):
     def populate_table_with_function_data(self, function_data):
         for data in function_data:
             offset = data.get("offset", "-")
-            original_name = data.get("old_name", "")  
+            original_name = data.get("old_name", "")
             new_name = data.get("new_name", "-")
-            
+
             row = self.find_row_with_offset(offset)
+
 
             if row is not None:
                 table_item_offset = QTableWidgetItem(hex(offset))
@@ -42,18 +43,76 @@ class MyDockWidget(cutter.CutterDockWidget):
                 table_item_original_name = QTableWidgetItem(original_name)
                 table_item_original_name.setFlags(table_item_original_name.flags() & ~Qt.ItemIsEditable)
                 table_item_new_name = QTableWidgetItem(new_name)
+
+
+                # Create a button and set it in the third column
+                restore_button = QPushButton("Restore Name")
+                restore_button.clicked.connect(self.restore_name_clicked)
+
+                self.table_widget.setCellWidget(row, 3, restore_button)
                 self.table_widget.setItem(row, 0, table_item_offset)
                 self.table_widget.setItem(row, 1, table_item_original_name)
                 self.table_widget.setItem(row, 2, table_item_new_name)
-            elif original_name!= new_name:
+
+
+            elif original_name != new_name:
                 row = self.table_widget.rowCount()
                 self.table_widget.insertRow(row)
                 table_item_offset = QTableWidgetItem(hex(offset))
+                table_item_offset.setFlags(table_item_offset.flags() & ~Qt.ItemIsEditable)
                 table_item_original_name = QTableWidgetItem(original_name)
-                table_item_new_name = QTableWidgetItem(new_name)  
+                table_item_original_name.setFlags(table_item_original_name.flags() & ~Qt.ItemIsEditable)
+                table_item_new_name = QTableWidgetItem(new_name)
+
+                # Create a button and set it in the third column
+                restore_button = QPushButton("Restore Name")
+                restore_button.clicked.connect(self.restore_name_clicked)
+                self.table_widget.setCellWidget(row, 3, restore_button)
                 self.table_widget.setItem(row, 0, table_item_offset)
                 self.table_widget.setItem(row, 1, table_item_original_name)
                 self.table_widget.setItem(row, 2, table_item_new_name)
+
+
+    def on_cell_changed(self, row, column):
+        if column == 2:  # Проверяем, что изменение произошло в столбце New Name
+            item = self.table_widget.item(row, column)
+            offset = int(self.table_widget.item(row, 0).text(), 16)  # Получаем offset из пользовательских данных
+            new_name = item.text()  # Получаем новое имя
+            cutter.cmd(f"s {offset}")
+            cutter.cmd(f"afn {new_name}")
+            self.update_name_in_json(offset, new_name)
+
+
+
+
+
+    def restore_name_clicked(self):
+        button = self.sender()
+        if button:
+            row = self.table_widget.indexAt(button.pos()).row()
+            offset = int(self.table_widget.item(row, 0).text(), 16)
+            old_name = self.table_widget.item(row, 1).text()
+            cutter.cmd(f"s {offset}")
+            cutter.cmd(f"afn {old_name}")
+            self.update_name_in_json(offset, old_name)
+            self.table_widget.removeRow(row)
+            cutter.refresh()
+            
+    def update_name_in_json(self, offset, new_name):
+        uid = cutter.cmdj("ij")  
+        project_guid = uid["bin"]["guid"]
+        current_dir = os.path.dirname(__file__)
+        self.file_path = os.path.join(current_dir, f"renamed_functions{project_guid}.json")
+        with open(self.file_path, 'r') as file:
+            data = json.load(file)
+
+        for item in data:
+            if item["offset"] == offset:
+                item["new_name"] = new_name
+
+        with open(self.file_path, 'w') as file:
+            json.dump(data, file) 
+
 
     def find_row_with_offset(self, offset):
         for row in range(self.table_widget.rowCount()):
@@ -66,7 +125,8 @@ class MyDockWidget(cutter.CutterDockWidget):
         header.setSectionResizeMode(0, QHeaderView.Stretch)  
         header.setSectionResizeMode(1, QHeaderView.Stretch)  
         header.setSectionResizeMode(2, QHeaderView.Stretch)  
-        
+        self.table_widget.cellChanged.connect(self.on_cell_changed)
+
         self.table_widget.itemDoubleClicked.connect(self.item_double_clicked)  # подключаем событие
 
     def item_double_clicked(self, item):
