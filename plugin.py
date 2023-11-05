@@ -74,6 +74,8 @@ class MyDockWidget(cutter.CutterDockWidget):
 
 
     def on_cell_changed(self, row, column):
+        self.table_widget.cellChanged.disconnect(self.on_cell_changed)
+        
         if column == 2:  # Проверяем, что изменение произошло в столбце New Name
             item = self.table_widget.item(row, column)
             offset = int(self.table_widget.item(row, 0).text(), 16)  # Получаем offset из пользовательских данных
@@ -81,10 +83,9 @@ class MyDockWidget(cutter.CutterDockWidget):
             cutter.cmd(f"s {offset}")
             cutter.cmd(f"afn {new_name}")
             self.update_name_in_json(offset, new_name)
+            cutter.refresh()
 
-
-
-
+        self.table_widget.cellChanged.connect(self.on_cell_changed)
 
     def restore_name_clicked(self):
         button = self.sender()
