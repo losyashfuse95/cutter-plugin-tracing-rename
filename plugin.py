@@ -211,5 +211,5 @@ class MyCutterPlugin(cutter.CutterPlugin):
     def terminate(self):
         pass  
 
-def create_cutter_plugin():
-    return MyCutterPlugin()
+# def create_cutter_plugin():
+#     return MyCutterPlugin()
