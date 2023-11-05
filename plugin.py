@@ -1,6 +1,7 @@
 import cutter
 import json
 import os
+from PySide2.QtCore import Qt
 
 from PySide2.QtWidgets import QAction, QTableWidget, QTableWidgetItem, QLineEdit, QVBoxLayout, QWidget, QSizePolicy, QHeaderView
 
@@ -14,29 +15,34 @@ class MyDockWidget(cutter.CutterDockWidget):
         layout = QVBoxLayout()  
         self.table_widget = QTableWidget()  
         self.table_widget.setColumnCount(3)  
-        self.table_widget.setHorizontalHeaderLabels(["Address", "New Name", "Original Name"])  
+        self.table_widget.setHorizontalHeaderLabels(["Address", "Original Name", "New Name"])  
         self.set_table_width() 
         layout.addWidget(self.table_widget)  
 
         self.setWidget(QWidget(self))  
         self.widget().setLayout(layout)  
 
-        self.table_widget.itemClicked.connect(self.on_item_clicked)  
-        cutter.core().functionRenamed.connect(self.plugin.update_function_data)
+        cutter.core().refreshAll.connect(self.plugin.create_json)
         cutter.core().refreshAll.connect(self.plugin.first_load_to_json)
+        cutter.core().functionRenamed.connect(self.plugin.update_function_data)
+
         self.table_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  
 
     def populate_table_with_function_data(self, function_data):
         for data in function_data:
             offset = data.get("offset", "-")
-            original_name = data.get("new_name", "-")
-            new_name = data.get("old_name", "")  
+            original_name = data.get("old_name", "")  
+            new_name = data.get("new_name", "-")
             
             row = self.find_row_with_offset(offset)
 
             if row is not None:
+                table_item_offset = QTableWidgetItem(hex(offset))
+                table_item_offset.setFlags(table_item_offset.flags() & ~Qt.ItemIsEditable)
                 table_item_original_name = QTableWidgetItem(original_name)
+                table_item_original_name.setFlags(table_item_original_name.flags() & ~Qt.ItemIsEditable)
                 table_item_new_name = QTableWidgetItem(new_name)
+                self.table_widget.setItem(row, 0, table_item_offset)
                 self.table_widget.setItem(row, 1, table_item_original_name)
                 self.table_widget.setItem(row, 2, table_item_new_name)
             elif original_name!= new_name:
@@ -60,16 +66,14 @@ class MyDockWidget(cutter.CutterDockWidget):
         header.setSectionResizeMode(0, QHeaderView.Stretch)  
         header.setSectionResizeMode(1, QHeaderView.Stretch)  
         header.setSectionResizeMode(2, QHeaderView.Stretch)  
+        
+        self.table_widget.itemDoubleClicked.connect(self.item_double_clicked)  # подключаем событие
 
-    def on_item_clicked(self, item):
-        if item.column() == 2: 
-            line_edit = QLineEdit(item.text())  
-            line_edit.editingFinished.connect(lambda: self.update_new_name(item.row(), line_edit.text()))  
-            self.table_widget.setCellWidget(item.row(), item.column(), line_edit)  
+    def item_double_clicked(self, item):
+        if item.column() == 0:  # проверяем, что событие произошло в колонке с адресом
+            address = int(item.text(), 16)  # получаем адрес из ячейки таблицы
+            cutter.cmd(f"s {hex(address)}")  # выполняем команду для перехода в дизассемблерное окно
 
-    def update_new_name(self, row, new_name):
-        item = QTableWidgetItem(new_name)
-        self.table_widget.setItem(row, 2, item)  
 
 class MyCutterPlugin(cutter.CutterPlugin):
     name = "My Plugin"  
@@ -79,11 +83,7 @@ class MyCutterPlugin(cutter.CutterPlugin):
     widget = None
 
     def setupPlugin(self):
-        current_dir = os.path.dirname(__file__)
-        self.file_path = os.path.join(current_dir, "renamed_functions.json")
-        if not os.path.exists(self.file_path):
-            with open(self.file_path, 'w') as file:
-                json.dump([], file)  
+        pass
 
     def update_function_data(self):
         with open(self.file_path, 'r') as file:
@@ -97,11 +97,22 @@ class MyCutterPlugin(cutter.CutterPlugin):
         self.add_to_json(self.file_path, data)
         self.load_data_from_json(self.file_path)
 
+    def create_json(self):
+        uid = cutter.cmdj("ij")  
+        project_guid = uid["bin"]["guid"]
+        current_dir = os.path.dirname(__file__)
+        self.file_path = os.path.join(current_dir, f"renamed_functions{project_guid}.json")
+        if not os.path.exists(self.file_path):
+            with open(self.file_path, 'w') as file:
+                json.dump([], file)  
 
     def first_load_to_json (self):
+
+        uid = cutter.cmdj("ij")  
+        project_guid = uid["bin"]["guid"]
         current_dir = os.path.dirname(__file__)
-        file_path = os.path.join(current_dir, "renamed_functions.json")
-        with open(file_path, 'r') as file:
+        self.file_path = os.path.join(current_dir, f"renamed_functions{project_guid}.json")
+        with open(self.file_path, 'r') as file:
             data = json.load(file)
             if data == []:
                 function_data = self.get_function_data()
