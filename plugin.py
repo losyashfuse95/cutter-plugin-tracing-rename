@@ -69,27 +69,6 @@ class MyCutterPlugin(cutter.CutterPlugin):
             with open(self.file_path, 'w') as file:
                 json.dump([], file)  
 
-        self.initial_data_file_path = os.path.join(current_dir, "initial_data.json")
-        if not os.path.exists(self.initial_data_file_path):
-            with open(self.initial_data_file_path, 'w') as file:
-                json.dump([], file) 
-
-    def update_function_data_initial_data(self):
-        function_data = self.get_function_data_initial_data()
-        self.add_to_json(self.initial_data_file_path, function_data)
-        self.load_data_from_json(self.file_path)
-
-    def get_function_data_initial_data(self):
-        functions = cutter.cmdj("aflj")  
-        filtered_data = []  
-        for function in functions:
-            filtered_function = {
-                "offset": function["offset"],  
-                "name": function["name"],  
-            }
-            filtered_data.append(filtered_function)  
-        return filtered_data
-
     def update_function_data(self):
         function_data = self.get_function_data()
         self.add_to_json(self.file_path, function_data)
