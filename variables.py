@@ -15,7 +15,7 @@ class MyDockWidget(cutter.CutterDockWidget):
         layout = QVBoxLayout()  
         self.table_widget = QTableWidget()  
         self.table_widget.setColumnCount(4)  
-        self.table_widget.setHorizontalHeaderLabels(["Address", "Original Name", "New Name", ""])  
+        self.table_widget.setHorizontalHeaderLabels(["Address function", "Original Name", "New Name", ""])  
         self.set_table_width() 
         layout.addWidget(self.table_widget)  
 
@@ -33,9 +33,9 @@ class MyDockWidget(cutter.CutterDockWidget):
             offset = data.get("offset", "-")
             original_name = data.get("old_name", "")
             new_name = data.get("new_name", "-")
-            local_variables = data.get("local_variables", [])  # Retrieve local variables
 
             row = self.find_row_with_offset(offset)
+
 
             if row is not None:
                 table_item_offset = QTableWidgetItem(hex(offset))
@@ -43,17 +43,17 @@ class MyDockWidget(cutter.CutterDockWidget):
                 table_item_original_name = QTableWidgetItem(original_name)
                 table_item_original_name.setFlags(table_item_original_name.flags() & ~Qt.ItemIsEditable)
                 table_item_new_name = QTableWidgetItem(new_name)
-                table_item_local_variables = QTableWidgetItem(str(local_variables))  # Display local variables
 
-                # Create a button and set it in the fourth column
+
+                # Create a button and set it in the third column
                 restore_button = QPushButton("Restore Name")
                 restore_button.clicked.connect(self.restore_name_clicked)
 
-                self.table_widget.setCellWidget(row, 4, restore_button)  # Set the button in the fourth column
+                self.table_widget.setCellWidget(row, 3, restore_button)
                 self.table_widget.setItem(row, 0, table_item_offset)
                 self.table_widget.setItem(row, 1, table_item_original_name)
                 self.table_widget.setItem(row, 2, table_item_new_name)
-                self.table_widget.setItem(row, 3, table_item_local_variables)  # Set the local variables in the fourth column
+
 
             elif original_name != new_name:
                 row = self.table_widget.rowCount()
@@ -63,16 +63,14 @@ class MyDockWidget(cutter.CutterDockWidget):
                 table_item_original_name = QTableWidgetItem(original_name)
                 table_item_original_name.setFlags(table_item_original_name.flags() & ~Qt.ItemIsEditable)
                 table_item_new_name = QTableWidgetItem(new_name)
-                table_item_local_variables = QTableWidgetItem(str(local_variables))  # Display local variables
 
-                # Create a button and set it in the fourth column
+                # Create a button and set it in the third column
                 restore_button = QPushButton("Restore Name")
                 restore_button.clicked.connect(self.restore_name_clicked)
-                self.table_widget.setCellWidget(row, 4, restore_button)  # Set the button in the fourth column
+                self.table_widget.setCellWidget(row, 3, restore_button)
                 self.table_widget.setItem(row, 0, table_item_offset)
                 self.table_widget.setItem(row, 1, table_item_original_name)
                 self.table_widget.setItem(row, 2, table_item_new_name)
-                self.table_widget.setItem(row, 3, table_item_local_variables)  # Set the local variables in the fourth column
 
 
     def on_cell_changed(self, row, column):
@@ -130,12 +128,12 @@ class MyDockWidget(cutter.CutterDockWidget):
         header.setSectionResizeMode(2, QHeaderView.Stretch)  
         self.table_widget.cellChanged.connect(self.on_cell_changed)
 
-        self.table_widget.itemDoubleClicked.connect(self.item_double_clicked) 
+        self.table_widget.itemDoubleClicked.connect(self.item_double_clicked)  # подключаем событие
 
     def item_double_clicked(self, item):
-        if item.column() == 0:  
-            address = int(item.text(), 16)  
-            cutter.cmd(f"s {hex(address)}") 
+        if item.column() == 0:  # проверяем, что событие произошло в колонке с адресом
+            address = int(item.text(), 16)  # получаем адрес из ячейки таблицы
+            cutter.cmd(f"s {hex(address)}")  # выполняем команду для перехода в дизассемблерное окно
 
 
 class MyCutterPlugin(cutter.CutterPlugin):
@@ -157,10 +155,8 @@ class MyCutterPlugin(cutter.CutterPlugin):
                 if entry["offset"] == function["offset"]:
                     entry["offset"] = function["offset"]
                     entry["new_name"] = function["name"]
-                    entry["local_variables"] = cutter.cmdj(f"afvj @ {function['offset']}")
         self.add_to_json(self.file_path, data)
         self.load_data_from_json(self.file_path)
-
 
     def create_json(self):
         uid = cutter.cmdj("ij")  
@@ -189,15 +185,17 @@ class MyCutterPlugin(cutter.CutterPlugin):
         filtered_data = []  
         for function in functions:
             local_variables = cutter.cmdj(f"afvj @ {function['offset']}")
+            local_variables_name = [var['name'] for var in local_variables.get('stack', [])]
+
             filtered_function = {
                 "offset": function["offset"],  
                 "new_name": function["name"],  
                 "old_name":  function["name"],
-                "local_variables": local_variables
+                "new_local_variables": local_variables_name,
+                "old_local_variables": local_variables_name
             }
             filtered_data.append(filtered_function)  
         return filtered_data
-
 
     def add_to_json(self, file_path, data):
         with open(file_path, 'w') as file:
