@@ -21,17 +21,20 @@ class MyDockWidget(cutter.CutterDockWidget):
 
         self.setWidget(QWidget(self))  
         self.widget().setLayout(layout)  
-
+        self.name_vars={}
         cutter.core().refreshAll.connect(self.plugin.create_json)
         cutter.core().refreshAll.connect(self.plugin.first_load_to_json)
         cutter.core().refreshAll.connect(self.plugin.update_function_data)
+        cutter.core().functionRenamed.connect(self.plugin.update_function_data)
 
 
         self.table_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)  
-        # self.table_widget.itemDoubleClicked.connect(self.item_double_clicked)
+        self.table_widget.cellChanged.connect(self.on_cell_changed)
+        self.table_widget.itemDoubleClicked.connect(self.item_double_clicked)
 
     def populate_table_with_function_data(self, function_data):
         self.table_widget.setRowCount(0)
+        self.table_widget.cellChanged.disconnect(self.on_cell_changed)
 
         for data in function_data:
             row = None
@@ -82,8 +85,8 @@ class MyDockWidget(cutter.CutterDockWidget):
             for i in range (len(new_vars)):
                 if new_vars[i] != old_vars[i]:
                     row = self.find_row_with_offset(offset,old_vars[i])
-                    print(old_vars[i])
-                    print(row)
+                    self.name_vars[old_vars[i]] = new_vars[i]
+
                     if row is not None and row[1]==0:
                         table_item_offset = QTableWidgetItem(f'vars-{hex(offset)}')
                         table_item_offset.setFlags(table_item_offset.flags() & ~Qt.ItemIsEditable)
@@ -119,36 +122,42 @@ class MyDockWidget(cutter.CutterDockWidget):
                         self.table_widget.setItem(row, 1, table_item_original_name_vars)
                         self.table_widget.setItem(row, 2, table_item_new_name_vars)
                         # continue
-
+        self.table_widget.cellChanged.connect(self.on_cell_changed)
             
-
 
     def on_cell_changed(self, row, column):
         self.table_widget.cellChanged.disconnect(self.on_cell_changed)
-        
         if column == 2:  # Проверяем, что изменение произошло в столбце New Name
-            item = self.table_widget.item(row, column)
-            offset = int(self.table_widget.item(row, 0).text(), 16)  # Получаем offset из пользовательских данных
-            new_name = item.text()  # Получаем новое имя
-            cutter.cmd(f"s {offset}")
-            cutter.cmd(f"afn {new_name}")
-            self.update_name_in_json(offset, new_name)
-            cutter.refresh()
+            if len(self.table_widget.item(row, 0).text().split("-")) == 2:
+                item = self.table_widget.item(row, column)
+                offset = int(self.table_widget.item(row, 0).text().split("-")[-1], 16)  # Получаем offset из пользовательских данных
+                new_name = item.text()  # Получаем новое имя
+                cutter.cmd(f"s {offset}")
+                old_name = self.table_widget.item(row, 1).text()
+                cutter.cmd(f"afvn {new_name} {self.name_vars[old_name]}")
+                self.update_name_vars_in_json(offset, new_name)
+            else:
+                item = self.table_widget.item(row, column)
+                offset = int(self.table_widget.item(row, 0).text(), 16)  # Получаем offset из пользовательских данных
+                new_name = item.text()  # Получаем новое имя
+                cutter.cmd(f"s {offset}")
+                cutter.cmd(f"afn {new_name}")
+                self.update_name_in_json(offset, new_name)
+
+               
 
         self.table_widget.cellChanged.connect(self.on_cell_changed)
 
     def restore_name_clicked(self):
         button = self.sender()
-        if button:
+        if button: 
             row = self.table_widget.indexAt(button.pos()).row()
             if len(self.table_widget.item(row, 0).text().split("-")) == 2:
                 offset = int(self.table_widget.item(row, 0).text().split("-")[-1], 16)
-                print(offset)
                 old_name = self.table_widget.item(row, 1).text()
                 new_name = self.table_widget.item(row, 2).text()
                 cutter.cmd(f"s {offset}")
                 cutter.cmd(f"afvn {old_name} {new_name}")
-                print(f"afvn {new_name} {old_name}")
                 self.table_widget.removeRow(row)
                 self.update_name_vars_in_json(offset, old_name)
                 cutter.refresh()
@@ -206,15 +215,12 @@ class MyDockWidget(cutter.CutterDockWidget):
         header.setSectionResizeMode(0, QHeaderView.Stretch)  
         header.setSectionResizeMode(1, QHeaderView.Stretch)  
         header.setSectionResizeMode(2, QHeaderView.Stretch)  
-        # self.table_widget.cellChanged.connect(self.on_cell_changed)
 
-          # подключаем событие
 
     def item_double_clicked(self, item):
         if item.column() == 0:  # проверяем, что событие произошло в колонке с адресом
-            address = int(item.text(), 16)  # получаем адрес из ячейки таблицы
+            address = int(item.text().split("-")[-1], 16)
             cutter.cmd(f"s {hex(address)}") 
-            print(f's {hex(address)}') # выполняем команду для перехода в дизассемблерное окно
 
 
 class MyCutterPlugin(cutter.CutterPlugin):
